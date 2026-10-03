@@ -59,6 +59,7 @@ DEFAULT_PREFS = {
     "follow_up_days": 10,
     "audit_sample_size": 10,
     "jobspy": {"searches": [], "results_wanted": 20},
+    "priority_sources": ["infopark", "technopark"],   # fetched first, in this order
 }
 
 

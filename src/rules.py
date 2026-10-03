@@ -63,6 +63,21 @@ FREE_EMAIL_DOMAINS = {"gmail.com", "outlook.com", "yahoo.com", "yahoo.in", "hotm
 ATS_EMAIL_DOMAINS = {"greenhouse.io", "lever.co", "ashbyhq.com", "workday.com", "myworkday.com", "smartrecruiters.com"}
 
 
+_COMPANY_STOP = {"pvt", "ltd", "limited", "private", "technologies", "technology", "solutions", "systems", "software",
+                 "services", "infotech", "global", "india", "innovations", "labs", "group", "corp", "company",
+                 "the", "and", "inc", "llc", "llp", "digital", "info", "soft"}
+_SECOND_LEVEL = {"co", "com", "org", "net", "ac", "gov", "edu"}
+
+
+def _domain_matches(domain: str, slug: str, tokens: list[str]) -> bool:
+    """Company legal names ('SubHosting Innovations (P) Ltd') differ from mail domains (subhosting.net):
+    match on any distinctive name token appearing in the domain, or the domain's main label in the name."""
+    parts = domain.split(".")
+    core = parts[-3] if len(parts) >= 3 and parts[-2] in _SECOND_LEVEL else (parts[-2] if len(parts) >= 2 else domain)
+    dslug = re.sub(r"[^a-z0-9]", "", domain)
+    return slug in dslug or any(t in dslug for t in tokens) or (len(core) >= 4 and core in slug)
+
+
 def scan_scam(text: str, company: str = "") -> list[Flag]:
     flags: list[Flag] = []
     for pat in _MONEY:
@@ -81,13 +96,14 @@ def scan_scam(text: str, company: str = "") -> list[Flag]:
     if m:
         flags.append(Flag("id_request", "reject", "asks for ID / bank details", _snippet(text, m)))
     slug = re.sub(r"[^a-z0-9]", "", (company or "").lower())
+    tokens = [t for t in re.findall(r"[a-z0-9]+", (company or "").lower()) if len(t) >= 3 and t not in _COMPANY_STOP]
     for m in _EMAIL.finditer(text):
         domain = m.group(1).lower()
         if domain in FREE_EMAIL_DOMAINS:
             flags.append(Flag("free_email_recruiter", "review", f"recruiter contact on free domain {domain}",
                               _snippet(text, m)))
             break
-        if slug and slug not in re.sub(r"[^a-z0-9]", "", domain) and not any(domain.endswith(a) for a in ATS_EMAIL_DOMAINS):
+        if slug and not _domain_matches(domain, slug, tokens) and not any(domain.endswith(a) for a in ATS_EMAIL_DOMAINS):
             flags.append(Flag("contact_domain_mismatch", "review",
                               f"contact domain {domain} doesn't match company", _snippet(text, m)))
             break

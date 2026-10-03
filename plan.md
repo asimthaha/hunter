@@ -322,6 +322,15 @@ clean JSON like the above. Expect the `india` bucket to lean on JobSpy/Naukri an
 "paste a URL" entries more than the other two buckets.
 
 ### Sources
+- **Priority sources (run first, in order; `priority_sources` in preferences.yaml):**
+  1. **Infopark** (`infopark.in/companies-job`): server-rendered HTML table, paginated until an empty
+     page, one detail page per job (fetched once, then reused from the DB).
+  2. **Technopark** (`technopark.in/job-search`): the page is an Inertia app; the list comes from the
+     public JSON endpoint `/api/paginated-jobs`, details from the `data-page` JSON of
+     `/job-details/<id>` (description, contact email, walk-in drive info).
+  Both are complete feeds, so the 2-missed-runs closure rule applies. Technopark has published a
+  fraud alert about fake jobs using its name; the scam rules (§7) apply to these sources like any other.
+  Jobs are fetched politely (0.3-0.9 s between requests); `robots.txt` on both allows crawling.
 - Company ATS endpoints (primary)
 - 1–2 remote boards with APIs (Remotive, Himalayas)
 - JobSpy (Naukri + 1–2 Indeed countries), run slowly, secondary

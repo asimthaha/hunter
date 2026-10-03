@@ -108,18 +108,136 @@ def make_job(*, source, external_id, company, title, location, url, description_
 
 
 # ---------------------------------------------------------------------------------- fetching
-def _get_json(url: str, **kw):
+def _get(url: str, **kw):
+    """GET with timeout and exponential backoff. Returns the httpx response."""
     last: Exception | None = None
     for attempt in range(config.SOURCE_RETRIES):
         try:
             r = httpx.get(url, timeout=config.FETCH_TIMEOUT, follow_redirects=True,
                           headers={"User-Agent": "career-hub/0.1"}, **kw)
             r.raise_for_status()
-            return r.json()
+            return r
         except Exception as e:  # noqa: BLE001
             last = e
             time.sleep(min(2 ** attempt, 8) + random.random())
     raise RuntimeError(f"{url}: {type(last).__name__}: {last}")
+
+
+def _get_json(url: str, **kw):
+    return _get(url, **kw).json()
+
+
+def _polite() -> None:
+    time.sleep(random.uniform(0.3, 0.9))
+
+
+def known_jobs(conn, source: str) -> dict[str, tuple[str, str]]:
+    """external_id -> (description, location) for jobs already stored, so detail pages are fetched once."""
+    return {r["external_id"]: (r["description"] or "", r["location_raw"] or "")
+            for r in conn.execute("SELECT external_id, description, location_raw FROM jobs WHERE source=?", (source,))}
+
+
+# ---------------------------------------------------------------------------------- Kerala IT parks
+INFOPARK = "https://infopark.in"
+TECHNOPARK = "https://technopark.in"
+_IP_ROW = re.compile(
+    r'<tr>\s*<td class="head">([^<]*)</td>\s*<td class="head">(.*?)</td>\s*<td class="date">(.*?)</td>\s*'
+    r'<td>(.*?)</td>\s*<td class="btn-sec">\s*<a href="([^"]*/company-jobs/details/(\d+)/(\d+))"', re.S)
+
+
+def _ddmmyyyy(s: str) -> str | None:
+    m = re.fullmatch(r"\s*(\d{2})-(\d{2})-(\d{4})\s*", s or "")
+    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
+
+
+def parse_infopark_list(page_html: str) -> list[dict]:
+    return [{"posted": _ddmmyyyy(m.group(1)), "title": html.unescape(m.group(2)).strip(),
+             "company": html.unescape(m.group(3)).strip(), "last_date": html.unescape(m.group(4)).strip(),
+             "url": m.group(5), "job_id": m.group(7)} for m in _IP_ROW.finditer(page_html)]
+
+
+def parse_infopark_detail(page_html: str) -> dict:
+    con = re.search(r'<div class="con">\s*<h4>(.*?)</h4>(.*?)</div>', page_html, re.S)
+    company = html.unescape(con.group(1)).strip() if con else ""
+    contacts = [html.unescape(x).strip() for x in re.findall(r"<span>(.*?)</span>", con.group(2))] if con else []
+    s = page_html.find('class="deatil-box"')
+    e = page_html.find("</section>", s) if s >= 0 else -1
+    return {"company": company, "contacts": [c for c in contacts if c],
+            "description_html": page_html[s:e] if s >= 0 and e > s else ""}
+
+
+def fetch_infopark(wl, known: dict | None = None, max_pages: int = 40) -> list[dict]:
+    """Infopark Kochi/Cherthala/Thrissur: paginated HTML table + one detail page per new job."""
+    known, out, seen = known or {}, [], set()
+    for page in range(1, max_pages + 1):
+        url = f"{INFOPARK}/companies-job" + (f"?page={page}" if page > 1 else "")
+        rows = [r for r in parse_infopark_list(_get(url).text) if r["job_id"] not in seen]
+        if not rows:
+            break
+        for r in rows:
+            seen.add(r["job_id"])
+            if r["job_id"] in known:
+                desc, loc = known[r["job_id"]]
+            else:
+                try:
+                    _polite()
+                    d = parse_infopark_detail(_get(r["url"]).text)
+                except Exception as e:  # noqa: BLE001 - a failed detail is retried next run
+                    log.warning("infopark detail %s failed: %s", r["url"], e)
+                    continue
+                body = html_to_text(d["description_html"])
+                lm = re.search(r"Work Location\s*[-–:]\s*([^\n]+)", body)
+                loc = lm.group(1).strip() if lm else "Infopark, Kerala"
+                desc = (f"{body}\n\nCompany: {d['company'] or r['company']}\nContact: {' | '.join(d['contacts'])}\n"
+                        f"Last date to apply: {r['last_date']}")
+            out.append(make_job(source="infopark", external_id=r["job_id"], company=r["company"], title=r["title"],
+                                location=loc, url=r["url"], description_text=desc, posted_at=r["posted"],
+                                watchlist=wl))
+    return out
+
+
+def parse_inertia_page(page_html: str) -> dict:
+    m = re.search(r'data-page="([^"]*)"', page_html)
+    return json.loads(html.unescape(m.group(1))) if m else {}
+
+
+def technopark_description(jl: dict) -> str:
+    parts = [html_to_text(jl.get("job_description", ""))]
+    if jl.get("preferred_skills"):
+        parts.append("Qualifications / preferred skills:\n" + html_to_text(jl["preferred_skills"]))
+    if jl.get("is_walk_in") and str(jl.get("is_walk_in")) not in ("0", "False"):
+        parts.append(f"Walk-in drive on {jl.get('walk_in_start_date')} {jl.get('walk_in_start_time') or ''}"
+                     f"-{jl.get('walk_in_end_time') or ''}.\n" + html_to_text(jl.get("walk_in_address") or ""))
+    parts.append(f"Contact: {jl.get('contact_email') or 'not given'}\nLast date to apply: {jl.get('closing_date')}")
+    return "\n\n".join(p for p in parts if p)
+
+
+def fetch_technopark(wl, known: dict | None = None, max_pages: int = 60) -> list[dict]:
+    """Technopark Trivandrum: public JSON list (/api/paginated-jobs) + one detail page per new job."""
+    known, out = known or {}, []
+    for page in range(1, max_pages + 1):
+        data = _get_json(f"{TECHNOPARK}/api/paginated-jobs", params={"page": page, "search": "", "type": ""})
+        for j in data.get("data", []):
+            ext, url = str(j["id"]), f"{TECHNOPARK}/job-details/{j['id']}"
+            if ext in known:
+                desc, loc = known[ext]
+            else:
+                try:
+                    _polite()
+                    jl = parse_inertia_page(_get(url).text)["props"]["jobListing"]
+                except Exception as e:  # noqa: BLE001
+                    log.warning("technopark detail %s failed: %s", url, e)
+                    continue
+                desc, loc = technopark_description(jl), "Technopark, Thiruvananthapuram, Kerala"
+            out.append(make_job(source="technopark", external_id=ext, company=(j.get("company") or {}).get("company"),
+                                title=j.get("job_title"), location=loc, url=url, description_text=desc,
+                                posted_at=j.get("posted_date"), watchlist=wl))
+        if data.get("current_page", page) >= data.get("last_page", page):
+            break
+    return out
+
+
+PRIORITY_FETCHERS = {"infopark": fetch_infopark, "technopark": fetch_technopark}
 
 
 def fetch_greenhouse(c: dict, wl) -> list[dict]:
@@ -383,6 +501,11 @@ def run_all(conn, only: str | None = None) -> list[dict]:
     prefs = config.load_prefs()
     wl = load_watchlist()
     results = []
+    for name in prefs.get("priority_sources", []):          # Kerala IT parks first (plan: user priority)
+        fn = PRIORITY_FETCHERS.get(name)
+        if fn and (not only or only in name):
+            results.append(run_source(conn, name, lambda fn=fn, name=name: fn(wl, known_jobs(conn, name)),
+                                      complete_feed_source=name))
     for c in wl:
         fetcher = FETCHERS.get(c.get("ats"))
         if not fetcher:

@@ -39,8 +39,8 @@ def process_new(conn, llm: LLM) -> dict:
     return counts
 
 
-def run(conn, llm: LLM, *, fetch: bool = True, notify: bool = True) -> dict:
-    sources = ingest.run_all(conn) if fetch else []
+def run(conn, llm: LLM, *, fetch: bool = True, notify: bool = True, only: str | None = None) -> dict:
+    sources = ingest.run_all(conn, only) if fetch else []
     counts = process_new(conn, llm)
     path = digest.write(conn, notify=notify)
     return {"sources": sources, "processed": counts, "digest": path}

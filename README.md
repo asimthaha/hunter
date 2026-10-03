@@ -26,6 +26,10 @@ hub calibrate           # precision/recall on tests/golden/ (needs >=50 labelled
 ```
 Without installing the package, use `.venv\Scripts\python -m src.cli <command>` (or `pip install -e .` for `hub`).
 
+## Job sources
+`hub run` fetches Infopark (Kochi) and Technopark (Trivandrum) first, then the company watchlist and remote boards.
+Fetch just one with `python -m src.cli run --only technopark` (or edit `priority_sources` in `data/preferences.yaml`).
+
 ## Tests
 `pytest` (offline). `HUB_LIVE=1 pytest -m live` runs the golden-set recall check against the real API.
 

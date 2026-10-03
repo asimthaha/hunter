@@ -36,7 +36,7 @@ def cmd_init(a, conn):
 
 
 def cmd_run(a, conn):
-    res = pipeline.run(conn, _llm(conn), fetch=not a.no_fetch, notify=not a.no_notify)
+    res = pipeline.run(conn, _llm(conn), fetch=not a.no_fetch, notify=not a.no_notify, only=a.only)
     for s in res["sources"]:
         print(f"{s['source']}: fetched {s['fetched']} new {s['new']}" + (f"  ERROR {s['error']}" if s["error"] else ""))
     print("processed:", res["processed"])
@@ -174,6 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("run", cmd_run, help="ingest -> filter -> score -> digest")
     sp.add_argument("--no-fetch", action="store_true")
     sp.add_argument("--no-notify", action="store_true")
+    sp.add_argument("--only", help="fetch only sources whose name contains this (e.g. technopark)")
     add("score", cmd_score, help="score jobs already ingested")
     sp = add("review", cmd_review, help="interactive inbox")
     sp.add_argument("--bucket")
