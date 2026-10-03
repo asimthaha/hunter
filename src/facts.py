@@ -16,6 +16,7 @@ class FactBank:
     variants: dict[str, dict] = field(default_factory=dict)       # variant id -> {text, tags, parent, role}
     skills: dict[str, dict] = field(default_factory=dict)         # skill name (lower) -> skill
     education: list[dict] = field(default_factory=list)
+    certifications: list[dict] = field(default_factory=list)       # citable as evidence; not auto-rendered
     synonyms: set[tuple[str, str]] = field(default_factory=set)   # allowed (from, to), lower-cased
 
     def text_of(self, ident: str) -> str:
@@ -24,6 +25,9 @@ class FactBank:
             return self.variants[ident]["text"]
         if ident in self.summaries:
             return self.summaries[ident]
+        for item in self.education + self.certifications:
+            if item.get("id") == ident:
+                return item.get("text", "")
         if ident in self.roles:
             r = self.roles[ident]
             return f"{r.get('title', '')} {r.get('company', '')} {r.get('dates', '')} " + " ".join(
@@ -33,7 +37,8 @@ class FactBank:
         return ""
 
     def known_ids(self) -> set[str]:
-        return set(self.variants) | set(self.summaries) | set(self.facts)
+        extra = {i["id"] for i in self.education + self.certifications if "id" in i}
+        return set(self.variants) | set(self.summaries) | set(self.facts) | extra
 
     def for_prompt(self) -> str:
         """Compact text of the fact bank — identical on every call so it can be prompt-cached."""
@@ -45,9 +50,13 @@ class FactBank:
                 lines.append(f"  Fact [{f['id']}]")
                 for v in f.get("variants", []):
                     lines.append(f"    - [{v['id']}] {v['text']}  (tags: {', '.join(v.get('tags', []))})")
+        if self.education or self.certifications:
+            lines += ["", "Education and certifications (citable as evidence):"]
+            lines += [f"- [{i['id']}] {i['text']}" for i in self.education + self.certifications]
         lines += ["", "Skills:"]
         for s in self.skills.values():
-            lines.append(f"- {s['name']} ({s.get('level', '')}) evidence: {', '.join(s.get('evidence', []))}")
+            lvl = f" ({s['level']})" if s.get("level") else ""
+            lines.append(f"- {s['name']}{lvl} evidence: {', '.join(s.get('evidence', []))}")
         if self.synonyms:
             lines += ["", "Allowed substitutions (synonym_map):"]
             lines += [f"- {a} <-> {b}" for a, b in sorted(self.synonyms)]
@@ -68,6 +77,7 @@ def parse(raw: dict) -> FactBank:
     for s in raw.get("skills", []):
         fb.skills[s["name"].lower()] = s
     fb.education = raw.get("education", [])
+    fb.certifications = raw.get("certifications", [])
     for key, vals in (raw.get("synonym_map") or {}).items():
         for v in vals:
             fb.synonyms.add((key.lower(), v.lower()))

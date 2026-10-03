@@ -48,6 +48,19 @@ def test_substitution_is_whole_word_and_case_preserving():
     assert apply_substitutions("Data work", [{"from": "data", "to": "records"}]) == "Records work"
 
 
+def test_certifications_and_education_can_be_skill_evidence():
+    raw = {"version": 1, "summaries": [{"id": "s", "text": "x"}], "roles": [],
+           "certifications": [{"id": "cert-aws", "text": "AWS Cloud Technical Essentials"}],
+           "education": [{"id": "edu-1", "text": "MCA"}],
+           "skills": [{"name": "AWS", "evidence": ["cert-aws"]}, {"name": "Ghost", "evidence": ["cert-nope"]}]}
+    bank = factsmod.parse(raw)
+    ok = {"summary_id": "s", "variant_ids": [], "skills": ["AWS"], "substitutions": []}
+    assert validate_resume(ok, bank) == []
+    assert validate_resume({**ok, "skills": ["Ghost"]}, bank)          # unknown evidence id is rejected
+    assert "AWS Cloud Technical Essentials" in bank.for_prompt()
+    assert validate_draft([{"text": "I completed AWS Cloud Technical Essentials.", "fact_ids": ["cert-aws"]}], bank) == []
+
+
 # ---- drafts
 def good(**kw):
     s = {"text": "I built a Python ETL pipeline processing 2M records/day.", "fact_ids": ["acme-1a"]}

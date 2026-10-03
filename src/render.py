@@ -67,7 +67,7 @@ def pdf_text(pdf: bytes) -> tuple[int, str]:
 
 
 def _squash(s: str) -> str:
-    return re.sub(r"\s+|-(?=\s)", "", s).casefold()
+    return re.sub(r"[\s\-‐‑]+", "", s).casefold()   # wrapping may split words at hyphens
 
 
 def expected_strings(model: dict, contact: dict) -> list[str]:
