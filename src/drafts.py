@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 
 from . import config, db, facts as factsmod, prompts, validate
-from .evaluate import job_text
+from .evaluate import job_text, shared_context
 from .llm import LLM, LLMError, PIIGuardError, SchemaError
 
 SENSITIVE_Q = re.compile(
@@ -55,8 +55,8 @@ def generate(conn, llm: LLM, job_id: int, questions: list[str] | None = None) ->
         ask += " Also answer these screening questions, one draft each:\n" + "\n".join(f"- {q}" for q in allowed)
     try:
         out = llm.call(stage="drafts", model=config.DRAFT_MODEL, instructions=instructions,
-                       context=bank.for_prompt(), user=ask + "\n\n" + prompts.wrap_untrusted(job_text(job)),
-                       schema=DRAFT_SCHEMA, job_id=job_id, max_tokens=2000)
+                       context=shared_context(bank), user=ask + "\n\n" + prompts.wrap_untrusted(job_text(job)),
+                       schema=DRAFT_SCHEMA, job_id=job_id, max_tokens=8000)
     except (PIIGuardError, SchemaError, LLMError) as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "drafts": [], "answer_yourself_questions": blocked}
     ctx = [job["company"] or "", job["title"] or ""]

@@ -136,7 +136,11 @@ def decide(scores: dict, pay: str) -> str:
     return "skip"
 
 
-def _context(bank: factsmod.FactBank, prefs: dict) -> str:
+def shared_context(bank: factsmod.FactBank, prefs: dict | None = None) -> str:
+    """The cached prefix block used by EVERY Sonnet stage (evaluate, tailor, drafts). It must be byte-identical
+    across them — and across calls — so they all read one prompt-cache entry. Nothing per-job or per-request
+    (timestamps, ids) may ever go in here."""
+    prefs = prefs if prefs is not None else config.load_prefs()
     return (bank.for_prompt() + "\n\nCANDIDATE PREFERENCES\n"
             f"Target roles: {', '.join(prefs.get('target_roles', [])) or 'unspecified'}\n"
             f"Stack/seniority: {prefs.get('stack') or 'unspecified'}\n"
@@ -146,8 +150,8 @@ def _context(bank: factsmod.FactBank, prefs: dict) -> str:
 def extract_evaluation(llm: LLM, job, bank: factsmod.FactBank, prefs: dict, *, job_id: int | None = None) -> dict:
     _, instructions = prompts.load("evaluate")
     return llm.call(stage="evaluate", model=config.EVALUATE_MODEL, instructions=instructions,
-                    context=_context(bank, prefs), user=prompts.wrap_untrusted(job_text(job)),
-                    schema=EVALUATE_SCHEMA, job_id=job_id, max_tokens=2000)
+                    context=shared_context(bank, prefs), user=prompts.wrap_untrusted(job_text(job)),
+                    schema=EVALUATE_SCHEMA, job_id=job_id, max_tokens=8000)   # thinking tokens count too
 
 
 def assess(llm: LLM, job, bank, prefs, profile) -> dict:

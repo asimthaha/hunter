@@ -75,8 +75,13 @@ def build(conn, since_hours: int = 24) -> str:
     lines += [f"- {h['source']}: fetched {h['fetched']}, new {h['new']}" + "".join(f"\n  - WARNING: {w}" for w in h["warnings"])
               for h in health] or ["_no runs yet_"]
     sp = spend(conn)
+    from . import usage
+    u = usage.summary(conn, 30)["totals"]
     lines += ["", "## Spend (estimate)", "", f"- Today: ${sp['today']:.2f}", f"- Month to date: ${sp['month']:.2f}",
-              "- Compare with the spend limit in the Anthropic console.", ""]
+              "- Compare with the spend limit in the Anthropic console.",
+              f"- Caching (30 days): {u['cache_read_ratio'] * 100:.0f}% of prompt tokens read from the prompt cache "
+              f"(saved ~${u['saved_prompt_cache']:.2f}); {u['local_hits']} calls answered from the local cache "
+              f"(saved ~${u['saved_local']:.2f}). Details: `hub usage`.", ""]
     return "\n".join(lines)
 
 

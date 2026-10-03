@@ -15,8 +15,8 @@ class FakeClient:
 
     def _create(self, **req):
         self.sent.append(req)
-        block = SimpleNamespace(type="tool_use", input={"ok": True})
-        return SimpleNamespace(content=[block], id="req_1",
+        block = SimpleNamespace(type="text", text='{"ok": true}')
+        return SimpleNamespace(content=[block], id="req_1", stop_reason="end_turn",
                                usage=SimpleNamespace(input_tokens=10, output_tokens=5,
                                                      cache_read_input_tokens=0, cache_creation_input_tokens=0))
 

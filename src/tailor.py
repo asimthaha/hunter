@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from . import config, db, facts as factsmod, prompts, render, validate
-from .evaluate import job_text
+from .evaluate import job_text, shared_context
 from .llm import LLM, LLMError, PIIGuardError, SchemaError
 
 log = logging.getLogger("hub.tailor")
@@ -58,8 +58,8 @@ def tailor_job(conn, llm: LLM, job_id: int, *, force: bool = False) -> dict:
     version, instructions = prompts.load("tailor")
     try:
         sel = llm.call(stage="tailor", model=config.TAILOR_MODEL, instructions=instructions,
-                       context=bank.for_prompt(), user=prompts.wrap_untrusted(job_text(job)),
-                       schema=TAILOR_SCHEMA, job_id=job_id, max_tokens=2000)
+                       context=shared_context(bank, prefs), user=prompts.wrap_untrusted(job_text(job)),
+                       schema=TAILOR_SCHEMA, job_id=job_id, max_tokens=8000)
     except (PIIGuardError, SchemaError, LLMError) as e:
         conn.execute("UPDATE jobs SET last_error=? WHERE id=?", (str(e)[:500], job_id))
         conn.commit()

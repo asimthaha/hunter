@@ -4,6 +4,12 @@
 <h2>Spend (estimate)</h2>
 <p>Today ${{ "%.2f" | format(h.spend.today) }} · Month to date ${{ "%.2f" | format(h.spend.month) }}. Check the console spend limit too.</p>
 
+<h2>Caching (30 days)</h2>
+{% set t = h.usage.totals %}
+<p>{{ "%.0f" | format(t.cache_read_ratio * 100) }}% of prompt tokens read from the prompt cache (saved ~${{ "%.2f" | format(t.saved_prompt_cache) }}) ·
+  {{ t.local_hits }} calls answered from the local cache (saved ~${{ "%.2f" | format(t.saved_local) }}).</p>
+{% for r in h.usage.rows if r.hint %}<p class="warn">{{ r.stage }} / {{ r.model }}: {{ r.hint }}</p>{% endfor %}
+
 <h2>Sources</h2>
 <table><thead><tr><th>Source</th><th>Last run</th><th>Fetched</th><th>New</th><th>Warnings</th></tr></thead><tbody>
 {% for s in h.sources %}<tr><td>{{ s.source }}</td><td>{{ s.at }}</td><td>{{ s.fetched }}</td><td>{{ s.new }}</td>

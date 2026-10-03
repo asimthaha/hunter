@@ -26,6 +26,17 @@ hub calibrate           # precision/recall on tests/golden/ (needs >=50 labelled
 ```
 Without installing the package, use `.venv\Scripts\python -m src.cli <command>` (or `pip install -e .` for `hub`).
 
+## Caching and API usage
+Three caches cut cost: Anthropic prompt caching (fact bank shared by evaluate/tailor/drafts), a local response
+cache (identical request = no API call), and an HTTP cache for job sources. See what they save with:
+```
+python -m src.cli usage            # tokens, estimated cost, cache hit rates, warnings (--days N)
+python -m src.cli cache clear      # wipe local response + HTTP caches   (cache prune: drop old entries)
+python -m src.cli calibrate --fresh   # bypass the response cache when measuring the model itself
+```
+Tunables are in `src/config.py` (`CACHE_TTL`, `LLM_CACHE_ENABLED`, `HTTP_CACHE_FRESH_SECONDS`).
+Set `HUB_LLM_CACHE=0` to disable the response cache for one run.
+
 ## Job sources
 `hub run` fetches Infopark (Kochi) and Technopark (Trivandrum) first, then the company watchlist and remote boards.
 Fetch just one with `python -m src.cli run --only technopark` (or edit `priority_sources` in `data/preferences.yaml`).

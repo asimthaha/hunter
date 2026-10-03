@@ -40,6 +40,8 @@ def process_new(conn, llm: LLM) -> dict:
 
 
 def run(conn, llm: LLM, *, fetch: bool = True, notify: bool = True, only: str | None = None) -> dict:
+    from . import llm as llm_mod
+    llm_mod.prune_cache(conn)                      # drop stale local response-cache entries
     sources = ingest.run_all(conn, only) if fetch else []
     counts = process_new(conn, llm)
     path = digest.write(conn, notify=notify)

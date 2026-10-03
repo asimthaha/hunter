@@ -30,13 +30,27 @@ MAYBE_MIN_SKILLS = 3
 MAYBE_MIN_SENIORITY = 2
 MAYBE_MAX_RED_FLAG = 2
 
-# Rough per-million-token USD prices, used for the spend *estimate* only. Verify against the console.
+# Per-million-token USD prices, used for the spend *estimate* only. Verify against the console.
 PRICES = {
     "claude-haiku-4-5-20251001": {"in": 1.0, "out": 5.0},
-    "claude-sonnet-5-5": {"in": 3.0, "out": 15.0},
+    "claude-sonnet-5-5": {"in": 2.0, "out": 10.0},
 }
-CACHE_READ_MULT = 0.1
-CACHE_WRITE_MULT = 1.25
+CACHE_READ_MULT = 0.1          # cache reads bill at 0.1x input price
+CACHE_WRITE_MULT = 1.25        # 5-minute TTL writes
+CACHE_WRITE_MULT_1H = 2.0      # 1-hour TTL writes
+
+# --- Caching -------------------------------------------------------------------------------------
+# Prompt caching (Anthropic): 5-minute TTL suits `hub run` (requests seconds apart). Use "1h" if you run the
+# UI actions (tailor/draft) sporadically 5-60 minutes apart; a 1h write costs 2x instead of 1.25x.
+CACHE_TTL = "5m"
+# Minimum cacheable prefix per model; shorter prefixes silently don't cache. Used for hints in `hub usage`.
+CACHE_MIN_TOKENS = {"claude-haiku-4-5-20251001": 4096, "claude-sonnet-5-5": 512}
+# Local response cache: an identical request (model + prompts + posting + schema) is answered from SQLite.
+LLM_CACHE_ENABLED = True
+LLM_CACHE_MAX_AGE_DAYS = 60
+# HTTP cache for job-source fetches: reuse a response younger than this without asking the server again;
+# older entries are revalidated with ETag / If-Modified-Since when the server supports it.
+HTTP_CACHE_FRESH_SECONDS = 900
 
 # Approximate FX to USD, for pay comparison only.
 FX_TO_USD = {"USD": 1.0, "INR": 0.012, "EUR": 1.08, "GBP": 1.27, "CAD": 0.73, "AUD": 0.65, "SGD": 0.74}

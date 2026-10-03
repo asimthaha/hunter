@@ -211,5 +211,6 @@ def proposals(conn) -> list[dict]:
 
 def health(conn) -> dict:
     runs = [dict(r) for r in conn.execute("SELECT * FROM runs ORDER BY run_id DESC LIMIT 15")]
+    from . import usage
     return {"runs": runs, "sources": digest.source_health(conn), "spend": digest.spend(conn),
-            "audit": audit_sample(conn)}
+            "usage": usage.summary(conn, 30), "audit": audit_sample(conn)}

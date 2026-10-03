@@ -10,6 +10,7 @@ import random
 import re
 import socket
 import time
+import zlib
 from difflib import SequenceMatcher
 from html.parser import HTMLParser
 from urllib.parse import urlparse, urljoin
@@ -108,14 +109,58 @@ def make_job(*, source, external_id, company, title, location, url, description_
 
 
 # ---------------------------------------------------------------------------------- fetching
+_HTTP_CACHE = {"conn": None}
+
+
+def set_http_cache(conn) -> None:
+    """Enable the HTTP cache for subsequent fetches (None disables it). Set by run_all()."""
+    _HTTP_CACHE["conn"] = conn
+
+
+class CachedResponse:
+    """Minimal stand-in for httpx.Response, built from the http_cache table."""
+    def __init__(self, body: bytes, from_cache: str):
+        self.content, self.from_cache = body, from_cache
+        self.text = body.decode("utf-8", errors="replace")
+
+    def json(self):
+        return json.loads(self.text)
+
+
+def _cache_key(url: str, params: dict | None) -> str:
+    if not params:
+        return url
+    return url + "?" + "&".join(f"{k}={params[k]}" for k in sorted(params))
+
+
 def _get(url: str, **kw):
-    """GET with timeout and exponential backoff. Returns the httpx response."""
+    """GET with timeout, exponential backoff and (when enabled) an HTTP cache:
+    fresh entries are reused without a request; stale ones are revalidated (304 -> reuse)."""
+    conn = _HTTP_CACHE["conn"]
+    key = _cache_key(url, kw.get("params"))
+    cached = conn.execute("SELECT * FROM http_cache WHERE url=?", (key,)).fetchone() if conn is not None else None
+    headers = {"User-Agent": "career-hub/0.1"}
+    if cached is not None:
+        if time.time() - cached["fetched_at"] < config.HTTP_CACHE_FRESH_SECONDS:
+            return CachedResponse(zlib.decompress(cached["body"]), "fresh")
+        if cached["etag"]:
+            headers["If-None-Match"] = cached["etag"]
+        if cached["last_modified"]:
+            headers["If-Modified-Since"] = cached["last_modified"]
     last: Exception | None = None
     for attempt in range(config.SOURCE_RETRIES):
         try:
-            r = httpx.get(url, timeout=config.FETCH_TIMEOUT, follow_redirects=True,
-                          headers={"User-Agent": "career-hub/0.1"}, **kw)
+            r = httpx.get(url, timeout=config.FETCH_TIMEOUT, follow_redirects=True, headers=headers, **kw)
+            if r.status_code == 304 and cached is not None:
+                conn.execute("UPDATE http_cache SET fetched_at=? WHERE url=?", (time.time(), key))
+                conn.commit()
+                return CachedResponse(zlib.decompress(cached["body"]), "revalidated")
             r.raise_for_status()
+            if conn is not None and len(r.content) <= config.FETCH_MAX_BYTES:
+                conn.execute("INSERT OR REPLACE INTO http_cache (url, etag, last_modified, body, fetched_at) "
+                             "VALUES (?,?,?,?,?)", (key, r.headers.get("etag"), r.headers.get("last-modified"),
+                                                    zlib.compress(r.content), time.time()))
+                conn.commit()
             return r
         except Exception as e:  # noqa: BLE001
             last = e
@@ -501,6 +546,14 @@ def run_all(conn, only: str | None = None) -> list[dict]:
     prefs = config.load_prefs()
     wl = load_watchlist()
     results = []
+    set_http_cache(conn)
+    try:
+        return _run_all(conn, prefs, wl, results, only)
+    finally:
+        set_http_cache(None)
+
+
+def _run_all(conn, prefs, wl, results, only):
     for name in prefs.get("priority_sources", []):          # Kerala IT parks first (plan: user priority)
         fn = PRIORITY_FETCHERS.get(name)
         if fn and (not only or only in name):

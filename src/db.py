@@ -85,7 +85,17 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 );
 """
 
-MIGRATIONS: list[str] = [SCHEMA]  # index i -> migrate to user_version i+1
+SCHEMA_V2 = """
+CREATE TABLE IF NOT EXISTS llm_cache (          -- local response cache; stores results, never request bodies
+  key TEXT PRIMARY KEY, stage TEXT, model TEXT, result_json TEXT, created_at TEXT, hits INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS http_cache (
+  url TEXT PRIMARY KEY, etag TEXT, last_modified TEXT, body BLOB, fetched_at REAL
+);
+ALTER TABLE llm_usage ADD COLUMN local_cache_hit INTEGER NOT NULL DEFAULT 0;
+"""
+
+MIGRATIONS: list[str] = [SCHEMA, SCHEMA_V2]  # index i -> migrate to user_version i+1
 
 
 def now() -> str:

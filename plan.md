@@ -369,13 +369,31 @@ Survivors → `claude-haiku-4-5-20251001` for the eligibility gate. Passes →
 `claude-sonnet-5-5` for the full rubric. `unclear` → `needs_review`, not scored automatically.
 
 ### Cost controls
-- Prompt caching on the fact bank + instructions (identical every call). Check each cached
-  prefix meets the model's minimum cacheable length, or caching silently doesn't apply — the
-  eligibility prompt (no fact bank) may be too short to benefit.
+- **Prompt caching (implemented).** Request prefix order is tools (none) → system → messages.
+  `system[0]` is the fact bank + preferences (`evaluate.shared_context`, byte-identical for evaluate,
+  tailor and drafts, so all three read one cache entry); `system[1]` is the stage instructions; each has
+  a breakpoint. The job posting is in `messages`, after both. Nothing per-request (timestamps, ids) may
+  enter the prefix. Minimum cacheable prefix: 512 tokens on claude-sonnet-5-5 (our prefix is ~2.5K →
+  cached), 4096 on claude-haiku-4-5 (the eligibility prompt is ~0.5K → **cannot** use prompt caching;
+  the local response cache covers repeats). TTL is `config.CACHE_TTL` (5m default; "1h" for sporadic UI
+  use, writes cost 2x instead of 1.25x). `hub usage` shows cache read ratio per stage and warns when a
+  stage never reads (prefix too short or changing).
+- **Local response cache (implemented).** An identical request (model + system + user + schema) is
+  answered from SQLite (`llm_cache`, results only) with no API call — re-runs, crash recovery, repeated
+  calibration. The PII guard runs before the lookup. `hub calibrate --fresh` / `use_cache=False` bypass it;
+  `hub cache clear|prune` manage it; entries expire after `LLM_CACHE_MAX_AGE_DAYS`.
+- **HTTP cache for sources (implemented).** Responses are reused for `HTTP_CACHE_FRESH_SECONDS`, then
+  revalidated with ETag / If-Modified-Since where supported (`http_cache`). Job detail pages are fetched
+  once per job regardless.
+- **Structured outputs, not forced tool use.** claude-sonnet-5-5 rejects forced `tool_choice` with a 400,
+  so every stage uses `output_config.format` (json_schema). The API-facing schema drops unsupported
+  keywords (min/max…) and the full schema is re-validated locally on every response.
+- Adaptive thinking is on by default for Sonnet 5.5 and its tokens count against `max_tokens` (set to
+  8000 for the Sonnet stages). If spend matters, tune effort per stage after measuring with `hub usage`.
 - Batch API for the scheduled daily run (50% discount, stacks with caching). Note eligibility →
   evaluate is two sequential batches, so worst-case latency is longer than a day.
 - `hub add-url` uses the synchronous API — a job you found by hand shouldn't wait for a batch.
-- Structured output / tool use so responses are always valid JSON matching a schema.
+- Structured outputs so responses are always valid JSON matching a schema (see above).
 
 ### `evaluate.py`
 Writes results to `scores` (with model / prompt_version / facts_version), saves a markdown

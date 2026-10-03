@@ -146,9 +146,26 @@ def cmd_ghosted(a, conn):
 
 def cmd_calibrate(a, conn):
     from . import calibrate
-    m = calibrate.run(_llm(conn))
+    m = calibrate.run(LLM(conn=conn, use_cache=False if a.fresh else None))
     print(json.dumps(m, indent=2))
     print("GO" if m["go"] else "NO-GO (need >=50 cases, recall >=85%, precision >=70%)")
+
+
+def cmd_usage(a, conn):
+    from . import usage
+    print(usage.format_report(usage.summary(conn, a.days)))
+
+
+def cmd_cache(a, conn):
+    from . import llm
+    if a.action == "clear":
+        n1 = conn.execute("DELETE FROM llm_cache").rowcount
+        n2 = conn.execute("DELETE FROM http_cache").rowcount
+        conn.commit()
+        print(f"cleared {n1} response-cache and {n2} HTTP-cache entries")
+    else:
+        n = llm.prune_cache(conn)
+        print(f"pruned {n} response-cache entries older than {config.LLM_CACHE_MAX_AGE_DAYS} days")
 
 
 def cmd_ui(a, conn):
@@ -215,7 +232,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-notify", action="store_true")
     sp = add("ghosted", cmd_ghosted, help="mark applied jobs past follow-up as ghosted")
     sp.add_argument("--grace-days", type=int, default=7)
-    add("calibrate", cmd_calibrate, help="precision/recall on tests/golden/ (calls the API)")
+    sp = add("usage", cmd_usage, help="API tokens, cost estimate and cache hit rates")
+    sp.add_argument("--days", type=int, default=30)
+    sp = add("cache", cmd_cache, help="clear the local response/HTTP caches, or prune old entries")
+    sp.add_argument("action", choices=["clear", "prune"])
+    sp = add("calibrate", cmd_calibrate, help="precision/recall on tests/golden/ (calls the API)")
+    sp.add_argument("--fresh", action="store_true", help="bypass the local response cache")
     sp = add("ui", cmd_ui, help="local web UI on 127.0.0.1")
     sp.add_argument("--port", type=int, default=8765)
     sp.add_argument("--no-browser", action="store_true")
