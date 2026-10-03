@@ -1,7 +1,20 @@
+# Secrets
 .env
+.env.*
+!.env.example
 
-data/contact.yaml
-data/facts.yaml
-data/jobs.db
+# Personal data (see plan.md §3, §5)
+data/*.yaml
+!data/*.example.yaml
+data/*.db
+data/*.db-*
 reports/
 output/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/

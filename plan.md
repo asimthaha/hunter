@@ -85,9 +85,14 @@ career-hub/
     validate.py           # resume + draft validators
     render.py
     digest.py             # daily summary / notification
-    cli.py                # `hub review`, `hub shortlist`, `hub applied`, `hub add-url`, ...
+    cli.py                # `hub review`, `hub shortlist`, `hub applied`, `hub add-url`, `hub ui`, ...
+    actions.py            # shared operations called by BOTH cli.py and the web UI
+    web/
+      app.py              # minimal local UI (see §11a)
+      static/htmx.min.js  # vendored, no CDN
   templates/
     resume.html
+    web/                  # server-rendered UI pages (Jinja2)
   tests/
     golden/               # labeled postings from calibration — regression set
     test_validate.py
@@ -171,8 +176,9 @@ Approvals now cover only things the pipeline *proposes* (new facts, new watchlis
 referral notes awaiting you). Job progress lives entirely in `jobs.status` — no second status
 system.
 
-SQLite in WAL mode. Nothing edits `jobs.db` by hand while a run is in progress — review happens
-through `cli.py`, which uses the same transition helper.
+SQLite in WAL mode with a busy timeout, since the UI and a scheduled run can write at the same
+time. Nothing edits `jobs.db` by hand — review happens through `cli.py` or the web UI, which
+both call `actions.py` and so go through the same transition helper.
 
 ---
 
@@ -183,7 +189,8 @@ through `cli.py`, which uses the same transition helper.
   `output/`, `logs/`. Untrack anything sensitive already committed (`git rm --cached .env`).
   The repo has a GitHub remote — assume anything committed is public.
 - Python 3.11+, venv, install `anthropic`, `python-jobspy`, `playwright`, `pyyaml`, `jinja2`,
-  `pytest`, `bleach` (or equivalent HTML sanitizer). Run `playwright install chromium`.
+  `pytest`, `bleach` (or equivalent HTML sanitizer), `fastapi`, `uvicorn`, `python-multipart`.
+  Run `playwright install chromium`. Download `htmx.min.js` once into `src/web/static/`.
 - API account at `platform.claude.com`, funded with pay-as-you-go credits and a **monthly spend
   limit** set in the console. Create **two keys** in the same account: one for Claude Code
   (building), one for the pipeline (`ANTHROPIC_API_KEY` in `.env`). Same billing view, but each
@@ -465,8 +472,8 @@ Two mechanisms, no overlap:
      watchlist yet
    - `contact_sent` — referral notes awaiting you to send manually
 
-Review runs on demand (`hub review`), not via a background watcher process. A small local HTML
-page can come later; if it does, all job text it displays must be sanitized (§12).
+Review runs on demand — in the minimal web UI (§11a) or `hub review` — not via a background
+watcher process.
 
 | Autonomous | Needs your action |
 |---|---|
@@ -482,6 +489,63 @@ This is a fixed pipeline with approval gates, not an open-ended planning agent �
 of steps is already known, so there's nothing for an agent to plan. If a continuously-running,
 phone-notifiable version is wanted later, revisit with the Claude Agent SDK (hooks) or an
 open-source runtime like OpenClaw — not needed for the first four weeks.
+
+---
+
+## 11a. Minimal local UI
+
+Purpose: make the daily review loop fast — read the digest, decide on jobs, grab the PDF and
+drafts, mark things done. It's a thin layer over `actions.py`; anything the UI can do, the CLI
+can do too, and neither contains business logic of its own.
+
+### Stack
+FastAPI + Jinja2 server-rendered pages + htmx (one vendored JS file) for button actions without
+full page reloads. No Node, no build step, no frontend framework. Plain CSS in one file. Started
+with `hub ui`, which runs uvicorn on `127.0.0.1` and opens the browser.
+
+### Screens (five, nothing more)
+1. **Inbox** (home) — today's new `apply` / `maybe` jobs and the `needs_review` queue. One row
+   per job: company, title, bucket, decision, top rubric scores, pay (or `not stated`), age.
+   Row buttons: **Shortlist**, **Skip**, **Ineligible**. Filter by bucket/decision.
+2. **Job detail** — rubric with reasons and supporting quotes, eligibility extraction, scam /
+   injection flags, the posting as escaped plain text, link to the original URL. Once tailored:
+   PDF download, screening-answer and referral-note drafts with copy buttons, "answer yourself"
+   fields (visa, CTC, notice) filled in from `profile.yaml`. Buttons: **Mark applied**,
+   **Contact sent**, status change, follow-up date.
+3. **Tracker** — everything `applied` and later, sorted by follow-up date; overdue follow-ups
+   highlighted. Inline status change (interviewing / offer / rejected / ghosted). CSV export.
+4. **Proposals** — `approvals` queue (`fact_bank_edit`, `watchlist_add`). Approving a fact-bank
+   proposal shows what's missing; you still write the fact in `facts.yaml` by hand.
+5. **Health** — last runs, per-source job counts and warnings, month-to-date spend estimate,
+   the weekly rejection-audit sample (§8) with an "I would have applied" button that saves the
+   case to `tests/golden/`.
+
+Plus a single **Add URL** box in the header (same path as `hub add-url`, synchronous API).
+
+### Explicitly not in the UI
+- Editing `facts.yaml`, `contact.yaml`, `profile.yaml` — edit the files by hand.
+- Submitting applications or sending messages — it only records that you did.
+- Login, multiple users, remote access, mobile layout.
+- Charts/dashboards beyond plain numbers on the Health page.
+
+### UI security (a localhost app is still reachable from any website you visit)
+- Bind to `127.0.0.1` only, never `0.0.0.0`.
+- Reject requests whose `Host` header isn't `127.0.0.1:<port>` / `localhost:<port>` (blocks DNS
+  rebinding).
+- No state changes on GET. Every POST carries a CSRF token (random per `hub ui` start, checked
+  server-side); cookies `SameSite=Strict`. This stops a malicious page from POSTing to
+  localhost to mark jobs or approve proposals.
+- Job text is rendered as autoescaped plain text — never `|safe`, never raw ATS HTML. Links from
+  postings are shown as text, apart from the job's own source URL.
+- `Content-Security-Policy: default-src 'self'` — no CDN scripts, no inline scripts, no external
+  images, so even an escaping bug can't load anything from outside.
+- PDFs and reports are served by job ID lookup, never by a file path from the request (no path
+  traversal).
+
+### When to build it
+After the Week 2 go/no-go, alongside Week 3 — the Inbox and Job detail screens are needed
+once shortlisting exists. Tracker, Proposals and Health can follow in Week 4. The CLI stays
+the fallback the whole time.
 
 ---
 
@@ -545,7 +609,7 @@ flag.
   checks — prefer clients paying in USD/EUR/GBP for GST export treatment, confirm with an
   accountant)
 - Gmail parsing to auto-update application status
-- A real UI (only once scrolling markdown reports becomes the actual bottleneck)
+- A richer UI beyond §11a (only once the minimal one becomes the actual bottleneck)
 - Skill-tree sync from roadmap.sh — just edit `facts.yaml` by hand instead
 - Agent SDK / OpenClaw-based continuous runtime with phone notifications
 - Non-English posting support (currently routed to `needs_review`)
