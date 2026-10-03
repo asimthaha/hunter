@@ -1,1 +1,7 @@
 .env
+
+data/contact.yaml
+data/facts.yaml
+data/jobs.db
+reports/
+output/
