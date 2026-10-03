@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Inbox</h1>
+<form method="get" class="filters">
+  <select name="bucket">
+    <option value="">all buckets</option>
+    {% for b in ["india", "remote-foreign", "relocation"] %}<option value="{{ b }}" {{ "selected" if b == bucket }}>{{ b }}</option>{% endfor %}
+  </select>
+  <select name="decision">
+    <option value="">apply + maybe</option>
+    {% for d in ["apply", "maybe"] %}<option value="{{ d }}" {{ "selected" if d == decision }}>{{ d }}</option>{% endfor %}
+  </select>
+  <button type="submit">Filter</button>
+</form>
+{% if rows %}
+<table>
+  <thead><tr><th>Company</th><th>Title</th><th>Bucket</th><th>Decision</th><th>Scores</th><th>Pay</th><th>Seen</th><th></th></tr></thead>
+  <tbody>{% for r in rows %}{% include "_row.html" %}{% endfor %}</tbody>
+</table>
+{% else %}<p>Nothing to review.</p>{% endif %}
+{% endblock %}

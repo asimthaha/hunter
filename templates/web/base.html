@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false}'>
+<title>{% block title %}Career Hub{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/htmx.min.js"></script>
+<script src="/static/app.js"></script>
+</head>
+<body hx-headers="{{ htmx_headers }}">
+<header>
+  <nav>
+    <a href="/">Inbox</a> <a href="/tracker">Tracker</a> <a href="/proposals">Proposals</a> <a href="/health">Health</a>
+  </nav>
+  <form hx-post="/add-url" hx-swap="none" class="addurl">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <input type="url" name="url" placeholder="Paste a job URL (http/https)" required>
+    <button type="submit">Add URL</button>
+  </form>
+</header>
+<div id="flash" role="alert"></div>
+<main>{% block body %}{% endblock %}</main>
+</body>
+</html>

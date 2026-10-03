@@ -1,0 +1,16 @@
+# Local settings (plan.md §0). Not PII-guarded; target_roles/stack ARE sent to the evaluation prompt.
+target_roles: [Backend Engineer, Data Engineer]
+stack: "Python, FastAPI, SQL; mid-level (3-5 years)"
+eligible_regions: [india, worldwide, anywhere, global, apac, asia]
+employment_types_excluded: []
+title_include_any: [engineer, developer]
+title_exclude_any: [sales, recruiter]
+seniority_exclude_any: [intern, internship, trainee, principal, director]
+pay_suspicious_usd: 400000
+resume_max_pages: 2
+company_cooldown_days: 14
+follow_up_days: 10
+audit_sample_size: 10
+jobspy:
+  results_wanted: 20
+  searches: []            # e.g. [{term: "python backend engineer", location: "Bengaluru", sites: [naukri], country: India}]

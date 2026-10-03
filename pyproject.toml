@@ -1,0 +1,20 @@
+[project]
+name = "career-hub"
+version = "0.1.0"
+description = "Local, AI-assisted job search pipeline (see plan.md)"
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic", "python-jobspy", "playwright", "pyyaml", "jinja2", "pytest", "bleach",
+  "fastapi", "uvicorn", "python-multipart", "httpx", "jsonschema", "pypdf",
+]
+
+[project.scripts]
+hub = "src.cli:main"
+
+[tool.setuptools]
+packages = ["src", "src.web"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["live: calls the real Anthropic API (set HUB_LIVE=1)"]

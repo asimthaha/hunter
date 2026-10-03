@@ -1,0 +1,8 @@
+# Local only. Read by render.py at PDF-build time. Never sent to any API (llm.py guard).
+name: Jane Example
+email: jane.example@example.com
+phone: "+91 98765 43210"
+location: Bengaluru, India
+links:
+  - https://github.com/janeexample
+  - https://www.linkedin.com/in/janeexample

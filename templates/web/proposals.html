@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Proposals</h1>
+<p>Approving a fact-bank proposal only records your decision. Write the fact in <code>data/facts.yaml</code> yourself, and only if it is true.</p>
+{% for p in rows %}
+<div class="card">
+  <b>{{ p.type }}</b> · job {{ p.payload.job_id or p.item_id }}
+  <pre>{{ p.payload.suggestion or p.payload.requirement or p.payload.note or p.payload }}</pre>
+  {% for dec, label in [("approve", "Approve"), ("reject", "Reject")] %}
+  <button hx-post="/proposals/{{ p.id }}/decide" hx-vals='{"decision": "{{ dec }}"}' hx-target="closest .card" hx-swap="outerHTML">{{ label }}</button>
+  {% endfor %}
+</div>
+{% else %}<p>No pending proposals.</p>{% endfor %}
+{% endblock %}

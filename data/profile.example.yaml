@@ -1,0 +1,11 @@
+# Local only. Never sent to any API (llm.py guard). Store money as ABSOLUTE annual amounts
+# (2500000, not "25 LPA") so the guard can recognise them.
+min_pay:
+  india:          {amount: 2500000, currency: INR, period: year}
+  remote-foreign: {amount: 40000,   currency: USD, period: year}
+  relocation:     {amount: 60000,   currency: USD, period: year}
+current_ctc:  {amount: 1800000, currency: INR, period: year}
+expected_ctc: {amount: 2800000, currency: INR, period: year}
+notice_days: 30                 # 0 = immediate
+notice_until: "2026-11-15"
+work_authorization: "Authorized to work in India; needs sponsorship elsewhere"

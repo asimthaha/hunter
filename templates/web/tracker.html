@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Tracker</h1>
+<p><a href="/tracker.csv">Export CSV</a></p>
+{% if rows %}
+<table>
+  <thead><tr><th>Company</th><th>Title</th><th>Status</th><th>Follow-up</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr class="{{ 'overdue' if r.overdue }}">
+    <td><a href="/job/{{ r.id }}">{{ r.company }}</a></td><td>{{ r.title }}</td><td>{{ r.status }}</td>
+    <td>{{ r.follow_up_on or "" }}{% if r.overdue %} <b>overdue</b>{% endif %}</td>
+    <td>
+      {% if r.status in ("applied", "interviewing") %}
+      <form hx-post="/job/{{ r.id }}/status" hx-swap="none" class="inline">
+        <select name="status">{% for s in statuses %}{% if s != "applied" %}<option {{ "selected" if s == r.status }}>{{ s }}</option>{% endif %}{% endfor %}</select>
+        <button type="submit">Set</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p>No applications yet.</p>{% endif %}
+{% endblock %}

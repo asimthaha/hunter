@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ d.job.title }}{% endblock %}
+{% block body %}
+{% set j = d.job %}
+<h1>{{ j.title }} — {{ j.company }}</h1>
+<p>Status: <b>{{ j.status }}</b> <small>({{ j.status_reason }})</small> · Bucket: {{ j.bucket or "?" }} · {{ j.location_raw }}
+  · <a href="{{ j.url }}" rel="noreferrer noopener" target="_blank">original posting</a>
+  · <a href="/job/{{ j.id }}/report.md">report</a></p>
+{% if j.last_error %}<p class="warn">Last error: {{ j.last_error }}</p>{% endif %}
+
+<section class="buttons">
+  {% if j.status in ("scored", "needs_review") %}
+    {% for a, label in [("shortlist", "Shortlist"), ("skip", "Skip"), ("ineligible", "Ineligible")] %}
+    <button hx-post="/job/{{ j.id }}/review" hx-vals='{"action": "{{ a }}", "redirect": "1"}'>{{ label }}</button>
+    {% endfor %}
+  {% endif %}
+  {% if j.status == "shortlisted" %}<button hx-post="/job/{{ j.id }}/tailor">Tailor resume</button>{% endif %}
+  {% if j.status == "tailored" %}<button hx-post="/job/{{ j.id }}/applied">Mark applied (I submitted it)</button>{% endif %}
+  {% if j.status in ("shortlisted", "tailored", "applied") %}<button hx-post="/job/{{ j.id }}/contact-sent">Contact sent (I sent it)</button>{% endif %}
+  {% if j.status in ("shortlisted", "tailored", "applied") %}<button hx-post="/job/{{ j.id }}/draft">Draft referral note</button>{% endif %}
+</section>
+
+{% if j.status in ("applied", "interviewing") %}
+<section>
+  <form hx-post="/job/{{ j.id }}/status" class="inline">
+    <select name="status">{% for s in tracker_statuses %}<option>{{ s }}</option>{% endfor %}</select>
+    <button type="submit">Change status</button>
+  </form>
+  <form hx-post="/job/{{ j.id }}/follow-up" class="inline">
+    <input type="date" name="date" value="{{ j.follow_up_on or '' }}"><button type="submit">Set follow-up</button>
+  </form>
+</section>
+{% endif %}
+
+{% if d.rules.flags %}<section><h2>Flags</h2><ul>
+  {% for f in d.rules.flags %}<li class="warn"><b>{{ f.kind }}</b> ({{ f.action }}): {{ f.reason }}<pre>{{ f.quote }}</pre></li>{% endfor %}
+</ul></section>{% endif %}
+
+{% if d.eligibility %}<section><h2>Eligibility: {{ d.eligibility.decision }}</h2>
+  <ul>{% for r in d.eligibility.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  {% set ext = d.eligibility.extraction %}
+  {% if ext %}<ul>
+    <li>Regions: {{ ext.allowed_regions.value }}</li>
+    <li>Work authorization: {{ ext.work_authorization.value }}</li>
+    <li>Employment: {{ ext.employment_type.value }}</li>
+    <li>Pay: {% if ext.pay.stated %}{{ ext.pay.amount_min }}–{{ ext.pay.amount_max }} {{ ext.pay.currency }} / {{ ext.pay.period }}{% else %}not stated{% endif %}</li>
+  </ul>{% endif %}
+</section>{% endif %}
+
+{% if d.evaluate %}<section><h2>Evaluation: {{ d.evaluate_decision }} <small>(pay: {{ d.evaluate.pay_status }})</small></h2>
+  <table>{% for k in ["skills_match", "seniority_fit", "domain", "timezone_overlap", "red_flags"] %}
+    {% if d.evaluate[k] %}<tr><th>{{ k }}</th><td>{{ d.evaluate[k].score }}/5</td><td>{{ d.evaluate[k].reason }}<pre>{{ d.evaluate[k].quote }}</pre></td></tr>{% endif %}
+  {% endfor %}</table>
+  <p>{{ d.evaluate.summary }}</p>
+</section>{% endif %}
+
+{% if d.tailor %}<section><h2>Resume</h2>
+  {% if d.tailor.errors %}<ul class="warn">{% for e in d.tailor.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  {% elif d.has_pdf %}<p><a href="/job/{{ j.id }}/resume.pdf">Download PDF</a> ({{ d.tailor.render.pages }} page(s))</p>{% endif %}
+  {% for m in d.tailor.selection.missing_evidence %}<p>Suggestion: {{ m.suggestion }}</p>{% endfor %}
+</section>{% endif %}
+
+{% if d.drafts.drafts %}<section><h2>Drafts</h2>
+  {% for dr in d.drafts.drafts %}
+    <h3>{{ dr.kind }} {{ dr.question }}</h3>
+    {% if dr.text %}<pre id="draft-{{ loop.index }}">{{ dr.text }}</pre>
+      <button data-copy="draft-{{ loop.index }}">Copy</button>
+    {% else %}<p class="warn">Rejected by validator: {{ dr.errors | join("; ") }}</p>{% endif %}
+  {% endfor %}
+</section>{% endif %}
+
+<section><h2>Answer yourself</h2>
+  <table>{% for k, v in d.answer_yourself.items() %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>
+</section>
+
+<section><h2>Posting (plain text)</h2><pre class="posting">{{ j.description }}</pre></section>
+
+<section><h2>History</h2><ul>
+  {% for e in d.events %}<li>{{ e.at }}: {{ e.from_status }} → {{ e.to_status }} — {{ e.reason }}</li>{% endfor %}
+</ul></section>
+{% endblock %}

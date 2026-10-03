@@ -1,0 +1,14 @@
+<tr>
+  <td><a href="/job/{{ r.id }}">{{ r.company }}</a></td>
+  <td><a href="/job/{{ r.id }}">{{ r.title }}</a></td>
+  <td>{{ r.bucket or "?" }}</td>
+  <td>{% if r.status == "needs_review" %}<b>needs review</b>{% else %}{{ r.decision }}{% endif %}</td>
+  <td>{% for k, v in r.scores.items() %}{{ k[:4] }}:{{ v }} {% endfor %}</td>
+  <td>{{ r.pay_status.replace("_", " ") }}</td>
+  <td>{{ r.first_seen[:10] if r.first_seen else "" }}</td>
+  <td class="actions">
+    {% for a, label in [("shortlist", "Shortlist"), ("skip", "Skip"), ("ineligible", "Ineligible")] %}
+    <button hx-post="/job/{{ r.id }}/review" hx-vals='{"action": "{{ a }}"}' hx-target="closest tr" hx-swap="outerHTML">{{ label }}</button>
+    {% endfor %}
+  </td>
+</tr>

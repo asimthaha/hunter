@@ -1,0 +1,5 @@
+# Watchlist: company + canonical name + ATS type + board token (plan.md §7). Start with ~30.
+companies:
+  - {name: Example Corp, canonical: example corp, ats: greenhouse, token: examplecorp}
+  - {name: Sample Labs,  canonical: sample labs,  ats: lever,      token: samplelabs}
+  - {name: Demo Systems, canonical: demo systems, ats: ashby,      token: demosystems}

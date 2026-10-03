@@ -143,7 +143,27 @@ shortlisted ──► tailored ──► applied             (`hub applied <id>`
 applied ──► interviewing ──► offer | rejected
 applied ──► rejected | ghosted                   (ghosted = no response after follow-up date)
 any pre-applied state ──► closed                 (job disappeared from source feed)
+filtered_out | ineligible | needs_review | scored ──► new   (reopen: posting text changed upstream)
+scored ──► ineligible                            (your decision, Inbox "Ineligible" button)
 ```
+
+**Implementation notes (Revision 3):**
+- Reopen (`→ new`) is used only by ingest when `description_hash` changes; later states just log an event.
+- `scores` also has `description_hash`; stages are `rules | eligibility | evaluate | tailor | drafts`.
+  A step is skipped when a score row exists for the same job + stage + hash (idempotency).
+- Extra tables: `artifacts` (PDF/report paths, served by job ID) and `llm_usage` (tokens + cost estimate).
+  `jobs` gained `missed_runs` (closure counter) and `last_error`.
+- Pay is extracted once, in the eligibility step (Haiku); the bucket comes from the evaluate step, so
+  the pay-vs-floor comparison runs in code after both.
+- Local settings that are not PII live in `data/preferences.yaml` (target roles, title/seniority
+  keywords, eligible regions, page limit, cooldown). They must not go in `profile.yaml`, because
+  every `profile.yaml` value is blocked by the PII guard.
+- `profile.yaml` stores money as absolute annual amounts (e.g. `2500000`), notice as `notice_days`.
+  Guard limits: strings < 5 chars and numbers < 5 digits are exempt (too generic to match safely);
+  a posting that states exactly your floor figure will be refused by the guard and routed to
+  `needs_review`.
+- Batch API is **not** implemented yet: the daily run uses the synchronous API with prompt caching.
+  Revisit once volume makes the 50% discount matter.
 
 Core tables:
 

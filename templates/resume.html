@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ name }} — Resume</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.35; color: #000; }
+  h1 { font-size: 18pt; margin: 0 0 2pt 0; }
+  h2 { font-size: 11pt; text-transform: uppercase; border-bottom: 1px solid #000; margin: 12pt 0 4pt 0; padding-bottom: 1pt; }
+  .contact { margin: 0 0 6pt 0; }
+  .role { margin: 6pt 0 2pt 0; font-weight: bold; }
+  ul { margin: 2pt 0 4pt 16pt; padding: 0; }
+  li { margin: 1pt 0; }
+  p { margin: 2pt 0; }
+</style>
+</head>
+<body>
+<h1>{{ name }}</h1>
+<p class="contact">{{ contact_line }}</p>
+
+<h2>Summary</h2>
+<p>{{ summary }}</p>
+
+{% if skills %}
+<h2>Skills</h2>
+<p>{{ skills | join(", ") }}</p>
+{% endif %}
+
+<h2>Experience</h2>
+{% for role in roles %}
+<p class="role">{{ role.title }}, {{ role.company }} — {{ role.dates }}</p>
+<ul>
+{% for b in role.bullets %}<li>{{ b.text }}</li>
+{% endfor %}</ul>
+{% endfor %}
+
+{% if education %}
+<h2>Education</h2>
+{% for e in education %}<p>{{ e.text }}</p>
+{% endfor %}{% endif %}
+</body>
+</html>

@@ -1,0 +1,34 @@
+version: 1                      # bump on every edit; recorded with every score
+summaries:
+  - id: sum-backend
+    text: Backend engineer focused on Python data systems and APIs.
+  - id: sum-data
+    text: Software engineer who builds reliable data pipelines in Python.
+roles:
+  - id: acme
+    title: Software Engineer
+    company: Acme
+    dates: 2023-01 to present
+    facts:
+      - id: acme-1
+        variants:
+          - id: acme-1a
+            text: Built a Python ETL pipeline processing 2M records/day
+            tags: [python, data, backend]
+          - id: acme-1b
+            text: Owned a data processing pipeline handling 2M daily records
+            tags: [python, data-pipeline, backend]
+      - id: acme-2
+        variants:
+          - id: acme-2a
+            text: Designed REST APIs with FastAPI serving internal dashboards
+            tags: [fastapi, api, backend]
+education:
+  - id: edu-1
+    text: B.Tech in Computer Science, Example University, 2022
+skills:
+  - {name: Python, level: strong, evidence: [acme-1]}      # every skill must cite a fact
+  - {name: FastAPI, level: working, evidence: [acme-2]}
+synonym_map:
+  ETL: [data pipeline, data processing]
+  # pre-approved substitutions only — vetted once here, never generated live by the model

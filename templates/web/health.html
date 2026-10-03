@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Health</h1>
+<h2>Spend (estimate)</h2>
+<p>Today ${{ "%.2f" | format(h.spend.today) }} · Month to date ${{ "%.2f" | format(h.spend.month) }}. Check the console spend limit too.</p>
+
+<h2>Sources</h2>
+<table><thead><tr><th>Source</th><th>Last run</th><th>Fetched</th><th>New</th><th>Warnings</th></tr></thead><tbody>
+{% for s in h.sources %}<tr><td>{{ s.source }}</td><td>{{ s.at }}</td><td>{{ s.fetched }}</td><td>{{ s.new }}</td>
+  <td class="warn">{{ s.warnings | join("; ") }}</td></tr>{% else %}<tr><td colspan="5">No runs yet.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Rejection audit (random sample)</h2>
+{% for a in h.audit %}
+<div class="card">
+  <a href="/job/{{ a.id }}">{{ a.title }} — {{ a.company }}</a> <small>{{ a.status }}: {{ a.status_reason }}</small>
+  <button hx-post="/health/golden/{{ a.id }}" hx-target="this" hx-swap="outerHTML">I would have applied</button>
+</div>
+{% else %}<p>Nothing rejected yet.</p>{% endfor %}
+{% endblock %}
