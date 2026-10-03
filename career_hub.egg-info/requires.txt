@@ -1,0 +1,13 @@
+anthropic
+python-jobspy
+playwright
+pyyaml
+jinja2
+pytest
+bleach
+fastapi
+uvicorn
+python-multipart
+httpx
+jsonschema
+pypdf

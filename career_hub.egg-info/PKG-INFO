@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: career-hub
+Version: 0.1.0
+Summary: Local, AI-assisted job search pipeline (see plan.md)
+Requires-Python: >=3.11
+Requires-Dist: anthropic
+Requires-Dist: python-jobspy
+Requires-Dist: playwright
+Requires-Dist: pyyaml
+Requires-Dist: jinja2
+Requires-Dist: pytest
+Requires-Dist: bleach
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: python-multipart
+Requires-Dist: httpx
+Requires-Dist: jsonschema
+Requires-Dist: pypdf
